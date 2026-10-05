@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Book Radar</string>
+    <string name="widget_name">Book Radar Widget</string>
+    <string name="widget_description">Sfoglia i migliori libri e novità con copertine e link Goodreads in 1 clic.</string>
+    <string name="sync_now">Sincronizza Ora</string>
+    <string name="add_widget_to_home">Aggiungi Widget alla Home</string>
+    <string name="open_goodreads">Apri su Goodreads</string>
+    <string name="open_amazon">Cerca su Amazon</string>
+    <string name="open_giunti">Apri su Giunti</string>
+</resources>

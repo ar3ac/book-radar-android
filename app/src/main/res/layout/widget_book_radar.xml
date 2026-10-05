@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_widget"
+    android:orientation="horizontal"
+    android:padding="10dp"
+    android:gravity="center_vertical">
+
+    <!-- Copertina Libro a Sinistra -->
+    <ImageView
+        android:id="@+id/widget_book_cover"
+        android:layout_width="85dp"
+        android:layout_height="match_parent"
+        android:layout_marginEnd="10dp"
+        android:scaleType="centerCrop"
+        android:src="@drawable/ic_book_placeholder"
+        android:contentDescription="Copertina Libro" />
+
+    <!-- Dettagli e Controlli a Destra -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <!-- Riga Badge & Prezzo -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/widget_book_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_badge"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="2dp"
+                android:text="✨ Novità"
+                android:textColor="#38BDF8"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/widget_book_price"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_badge"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="2dp"
+                android:text="€ 18,50"
+                android:textColor="#34D399"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Titolo del Libro -->
+        <TextView
+            android:id="@+id/widget_book_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:text="Titolo del Libro"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <!-- Autore -->
+        <TextView
+            android:id="@+id/widget_book_author"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="Autore del Libro"
+            android:textColor="#94A3B8"
+            android:textSize="11sp" />
+
+        <!-- Spazio flessibile per spingere i controlli in basso -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <!-- Barra Controlli Centrata -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginTop="4dp">
+
+            <ImageButton
+                android:id="@+id/widget_btn_prev"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="@drawable/bg_widget_btn"
+                android:src="@drawable/ic_prev"
+                android:padding="4dp"
+                android:contentDescription="Precedente" />
+
+            <ImageButton
+                android:id="@+id/widget_btn_goodreads"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_widget_btn"
+                android:src="@drawable/ic_goodreads"
+                android:padding="6dp"
+                android:contentDescription="Goodreads" />
+
+            <ImageButton
+                android:id="@+id/widget_btn_amazon"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_widget_btn"
+                android:src="@drawable/ic_amazon"
+                android:padding="6dp"
+                android:contentDescription="Amazon" />
+
+            <ImageButton
+                android:id="@+id/widget_btn_sync"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_widget_btn"
+                android:src="@drawable/ic_sync"
+                android:padding="6dp"
+                android:contentDescription="Sincronizza" />
+
+            <ImageButton
+                android:id="@+id/widget_btn_next"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_widget_btn"
+                android:src="@drawable/ic_next"
+                android:padding="4dp"
+                android:contentDescription="Successivo" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+</LinearLayout>

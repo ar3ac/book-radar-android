@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@drawable/ic_goodreads"
+        android:label="@string/app_name"
+        android:roundIcon="@drawable/ic_goodreads"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.BookRadar">
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Widget Provider -->
+        <receiver
+            android:name=".widget.BookRadarWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/book_radar_widget_info" />
+        </receiver>
+
+        <!-- Widget Action Receiver -->
+        <receiver
+            android:name=".widget.WidgetReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.ar3ac.bookradar.ACTION_PREV" />
+                <action android:name="com.ar3ac.bookradar.ACTION_NEXT" />
+                <action android:name="com.ar3ac.bookradar.ACTION_SYNC" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+
+</manifest>
