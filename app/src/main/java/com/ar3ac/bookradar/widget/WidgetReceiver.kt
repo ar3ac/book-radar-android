@@ -39,10 +39,15 @@ class WidgetReceiver : BroadcastReceiver() {
                 val syncWork = OneTimeWorkRequestBuilder<BookSyncWorker>().build()
                 WorkManager.getInstance(context).enqueue(syncWork)
 
+                val pendingResult = goAsync()
                 CoroutineScope(Dispatchers.IO).launch {
-                    repo.refreshBooks()
-                    BookRadarWidgetProvider.updateAllWidgets(context)
-                    WidgetAutoCycleManager.scheduleNextTick(context, resetDelay = true)
+                    try {
+                        repo.refreshBooks()
+                        BookRadarWidgetProvider.updateAllWidgets(context)
+                        WidgetAutoCycleManager.scheduleNextTick(context, resetDelay = true)
+                    } finally {
+                        pendingResult.finish()
+                    }
                 }
             }
             ACTION_CYCLE_TICK -> {

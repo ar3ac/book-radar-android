@@ -19,15 +19,20 @@ import kotlinx.coroutines.launch
 class BookRadarWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
-            val repo = BookRepository.getInstance(context)
-            if (repo.getCachedBooks().isEmpty()) {
-                repo.refreshBooks()
+            try {
+                val repo = BookRepository.getInstance(context)
+                if (repo.getCachedBooks().isEmpty()) {
+                    repo.refreshBooks()
+                }
+                for (id in appWidgetIds) {
+                    updateWidgetUI(context, appWidgetManager, id)
+                }
+                WidgetAutoCycleManager.scheduleNextTick(context)
+            } finally {
+                pendingResult.finish()
             }
-            for (id in appWidgetIds) {
-                updateWidgetUI(context, appWidgetManager, id)
-            }
-            WidgetAutoCycleManager.scheduleNextTick(context)
         }
     }
 

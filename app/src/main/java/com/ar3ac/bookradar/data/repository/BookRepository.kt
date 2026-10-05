@@ -5,12 +5,12 @@ import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.ar3ac.bookradar.data.model.Book
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.jsoup.Jsoup
 import java.io.File
 import java.io.FileOutputStream
 import java.net.URLEncoder
@@ -27,7 +27,10 @@ class BookRepository private constructor(private val context: Context) {
 
     private val cacheFile = File(context.filesDir, "books_cache.json")
     private val coversDir = File(context.filesDir, "covers").apply { mkdirs() }
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+    }
 
     companion object {
         @Volatile
@@ -39,24 +42,225 @@ class BookRepository private constructor(private val context: Context) {
             }
         }
 
-        private const val GIUNTI_URL = "https://giuntialpunto.it/collections/novita-da-non-perdere/products.json?limit=30"
+        private const val AMAZON_BESTSELLERS_URL = "https://www.amazon.it/gp/bestsellers/books"
+        private const val USER_AGENT_BROWSER = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         private const val PREF_CURRENT_INDEX = "pref_current_index"
     }
 
     suspend fun refreshBooks(): Result<List<Book>> = withContext(Dispatchers.IO) {
         try {
+            android.util.Log.d("BookRepository", "Inizio refreshBooks()...")
+            // Scarica in parallelo Bestseller Amazon e Novità Giunti
+            val amzDeferred = async { fetchAmazonBestsellers(15) }
+            val giuntiDeferred = async { fetchGiunti(20) }
+
+            val amzBooks = amzDeferred.await()
+            val giuntiBooks = giuntiDeferred.await()
+            android.util.Log.d("BookRepository", "Scaricati ${amzBooks.size} Amazon, ${giuntiBooks.size} Giunti")
+
+            // Interleave (alternanza) con deduplicazione su titolo normalizzato
+            val seenTitles = mutableSetOf<String>()
+            val mixedList = mutableListOf<Book>()
+            val maxLen = maxOf(amzBooks.size, giuntiBooks.size)
+
+            for (i in 0 until maxLen) {
+                if (i < amzBooks.size) {
+                    val b = amzBooks[i]
+                    val norm = normalizeTitle(b.title)
+                    if (seenTitles.add(norm)) {
+                        mixedList.add(b)
+                    }
+                }
+                if (i < giuntiBooks.size) {
+                    val b = giuntiBooks[i]
+                    val norm = normalizeTitle(b.title)
+                    if (seenTitles.add(norm)) {
+                        mixedList.add(b)
+                    }
+                }
+            }
+
+            if (mixedList.isNotEmpty()) {
+                val booksJson = json.encodeToString(mixedList)
+                cacheFile.writeText(booksJson)
+                Result.success(mixedList)
+            } else {
+                val cached = getCachedBooks()
+                if (cached.isNotEmpty()) {
+                    Result.success(cached)
+                } else {
+                    Result.failure(Exception("Nessun libro recuperato da Amazon né da Giunti"))
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("BookRepository", "Errore in refreshBooks", e)
+            val cached = getCachedBooks()
+            if (cached.isNotEmpty()) {
+                Result.success(cached)
+            } else {
+                Result.failure(e)
+            }
+        }
+    }
+
+    suspend fun fetchAmazonBestsellers(limit: Int = 15): List<Book> = withContext(Dispatchers.IO) {
+        try {
             val request = Request.Builder()
-                .url(GIUNTI_URL)
+                .url(AMAZON_BESTSELLERS_URL)
+                .header("User-Agent", USER_AGENT_BROWSER)
+                .header("Accept-Language", "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7")
+                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
+                .build()
+
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) return@withContext emptyList()
+
+            val html = response.body?.string() ?: return@withContext emptyList()
+            val doc = Jsoup.parse(html)
+            val items = doc.select("#gridItemRoot")
+            val books = mutableListOf<Book>()
+
+            for ((index, item) in items.take(limit).withIndex()) {
+                val idx = index + 1
+                val rankElem = item.selectFirst(".zg-bdg-text, span[class*='zg-badge'], .zg-bdg-body")
+                val rank = rankElem?.text()?.trim() ?: "#$idx"
+
+                val img = item.selectFirst("img")
+                val imgSrc = img?.attr("src") ?: ""
+
+                val titleElem = item.selectFirst("div[class*='line-clamp-1'], div[class*='line-clamp-2'], .p13n-sc-truncate")
+                val title = titleElem?.text()?.trim() ?: img?.attr("alt")?.trim() ?: ""
+                if (title.isEmpty()) continue
+
+                var author = "Autore Sconosciuto"
+                for (r in item.select(".a-row.a-size-small")) {
+                    val txt = r.text().trim()
+                    if (txt.isEmpty()) continue
+                    val txtLower = txt.lowercase()
+                    if (txtLower.contains("stelle") || txtLower.contains("formati")) continue
+                    if (listOf("copertina", "flessibile", "rigida", "kindle", "audiolibro").any { txtLower.contains(it) }) continue
+                    author = txt
+                    break
+                }
+
+                val priceElem = item.selectFirst("span[class*='price'], .p13n-sc-price")
+                val price = priceElem?.text()?.trim() ?: ""
+
+                val link = item.selectFirst("a.a-link-normal[href*='/dp/']")
+                val href = link?.attr("href") ?: ""
+                val asinMatch = Regex("/dp/([A-Z0-9]{10})").find(href)
+                val asin = asinMatch?.groupValues?.get(1) ?: "bestseller_$idx"
+
+                val amazonUrl = if (asinMatch != null) {
+                    "https://www.amazon.it/dp/$asin"
+                } else if (href.startsWith("/")) {
+                    "https://www.amazon.it$href"
+                } else {
+                    "https://www.amazon.it/gp/bestsellers/books"
+                }
+
+                val giuntiUrl = "https://giuntialpunto.it/search?q=" + URLEncoder.encode(title, "UTF-8")
+                val isIsbn10 = asin.matches(Regex("^\\d{9}[\\dXx]$"))
+                val isbn = if (isIsbn10) asin.uppercase() else ""
+                val cleanQuery = cleanGoodreadsQuery(title, author)
+                val goodreadsUrl = "https://www.goodreads.com/search?q=" + URLEncoder.encode(cleanQuery, "UTF-8")
+
+                // Risoluzione nativa alta qualità per copertina
+                val cleanImgUrl = if (imgSrc.isNotEmpty()) imgSrc.replace(Regex("\\._[^.]+\\.jpg$"), ".jpg") else ""
+                val targetDownloadUrl = cleanImgUrl.ifEmpty { imgSrc }
+
+                var localCoverPath: String? = null
+                if (targetDownloadUrl.isNotEmpty()) {
+                    val coverFile = File(coversDir, "amz_${asin}.jpg")
+                    if (!coverFile.exists() || coverFile.length() == 0L) {
+                        try {
+                            downloadFile(targetDownloadUrl, coverFile)
+                        } catch (_: Exception) {
+                            if (imgSrc.isNotEmpty() && imgSrc != targetDownloadUrl) {
+                                try {
+                                    downloadFile(imgSrc, coverFile)
+                                } catch (_: Exception) {}
+                            }
+                        }
+                    }
+                    if (coverFile.exists() && coverFile.length() > 0) {
+                        localCoverPath = coverFile.absolutePath
+                    }
+                }
+
+                books.add(
+                    Book(
+                        id = "amazon_$asin",
+                        title = title,
+                        author = author,
+                        isbn = isbn,
+                        price = price,
+                        description = "Classifica Bestseller Amazon: posizione $rank.",
+                        imageUrl = targetDownloadUrl,
+                        localCoverPath = localCoverPath,
+                        giuntiUrl = giuntiUrl,
+                        amazonUrl = amazonUrl,
+                        goodreadsUrl = goodreadsUrl,
+                        badge = "🏆 $rank Amazon"
+                    )
+                )
+            }
+
+            // Arricchimento asincrono sinossi in parallelo
+            coroutineScope {
+                val deferred = books.map { book ->
+                    async {
+                        val asin = book.id.removePrefix("amazon_")
+                        val fullDesc = withTimeoutOrNull(4000L) { fetchAmazonSynopsis(asin) }
+                        if (!fullDesc.isNullOrEmpty()) {
+                            book.copy(description = fullDesc)
+                        } else {
+                            book
+                        }
+                    }
+                }
+                deferred.awaitAll()
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private suspend fun fetchAmazonSynopsis(asin: String): String? = withContext(Dispatchers.IO) {
+        if (asin.isEmpty() || asin.startsWith("bestseller_")) return@withContext null
+        try {
+            val req = Request.Builder()
+                .url("https://www.amazon.it/dp/$asin")
+                .header("User-Agent", USER_AGENT_BROWSER)
+                .header("Accept-Language", "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7")
+                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                .build()
+            val resp = client.newCall(req).execute()
+            if (resp.isSuccessful) {
+                val html = resp.body?.string() ?: return@withContext null
+                val doc = Jsoup.parse(html)
+                val descElem = doc.selectFirst("#bookDescription_feature_div, #productDescription")
+                val text = descElem?.text()?.trim()
+                if (!text.isNullOrEmpty() && text.length > 20) {
+                    return@withContext text
+                }
+            }
+        } catch (_: Exception) {}
+        null
+    }
+
+    suspend fun fetchGiunti(limit: Int = 20): List<Book> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url("https://giuntialpunto.it/collections/novita-da-non-perdere/products.json?limit=$limit")
                 .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
                 .header("Accept", "application/json")
                 .build()
 
             val response = client.newCall(request).execute()
-            if (!response.isSuccessful) {
-                return@withContext Result.failure(Exception("HTTP Error: ${response.code}"))
-            }
+            if (!response.isSuccessful) return@withContext emptyList()
 
-            val bodyString = response.body?.string() ?: return@withContext Result.failure(Exception("Empty response body"))
+            val bodyString = response.body?.string() ?: return@withContext emptyList()
             val jsonRoot = json.parseToJsonElement(bodyString).jsonObject
             val products = jsonRoot["products"]?.jsonArray ?: JsonArray(emptyList())
 
@@ -69,13 +273,9 @@ class BookRepository private constructor(private val context: Context) {
                 val tags = p["tags"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
                 val bodyHtml = p["body_html"]?.jsonPrimitive?.content ?: ""
 
-                // Estrai autore
                 val author = parseGiuntiAuthors(tags, handle)
-
-                // Estrai ISBN (13 cifre da handle o tag)
                 val isbn = parseIsbn(handle, tags)
 
-                // Estrai prezzo
                 val variants = p["variants"]?.jsonArray
                 var priceStr = ""
                 if (!variants.isNullOrEmpty()) {
@@ -86,7 +286,6 @@ class BookRepository private constructor(private val context: Context) {
                     }
                 }
 
-                // Estrai immagine
                 val images = p["images"]?.jsonArray
                 val imageUrl = if (!images.isNullOrEmpty()) {
                     images[0].jsonObject["src"]?.jsonPrimitive?.content ?: ""
@@ -103,7 +302,6 @@ class BookRepository private constructor(private val context: Context) {
                 val goodreadsUrl = "https://www.goodreads.com/search?q=" + URLEncoder.encode(cleanQuery, "UTF-8")
                 val description = cleanHtml(bodyHtml)
 
-                // Download cover in locale
                 var localCoverPath: String? = null
                 if (imageUrl.isNotEmpty()) {
                     val coverFile = File(coversDir, "cover_${id}.jpg")
@@ -134,20 +332,9 @@ class BookRepository private constructor(private val context: Context) {
                     )
                 )
             }
-
-            if (books.isNotEmpty()) {
-                val booksJson = json.encodeToString(books)
-                cacheFile.writeText(booksJson)
-            }
-
-            Result.success(books)
+            books
         } catch (e: Exception) {
-            val cached = getCachedBooks()
-            if (cached.isNotEmpty()) {
-                Result.success(cached)
-            } else {
-                Result.failure(e)
-            }
+            emptyList()
         }
     }
 
@@ -233,6 +420,15 @@ class BookRepository private constructor(private val context: Context) {
                 }
             }
         }
+    }
+
+    private fun normalizeTitle(title: String): String {
+        var t = title.lowercase()
+        t = t.replace(Regex("(?i)\\bediz\\.?\\s+italiana\\b"), "")
+        t = t.replace(Regex("(?i)\\bediz\\.?\\s+a\\s+colori\\b"), "")
+        t = t.replace(Regex("(?i)\\blimited\\s+edition\\b"), "")
+        t = t.replace(Regex("[^\\p{L}\\p{Nd}\\s]"), " ")
+        return t.split(Regex("\\s+")).filter { it.isNotBlank() }.joinToString(" ")
     }
 
     private fun parseGiuntiAuthors(tags: List<String>, handle: String): String {

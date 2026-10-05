@@ -63,4 +63,7 @@ dependencies {
 
     // Image loading
     implementation("io.coil-kt:coil:2.5.0")
+
+    // HTML Parsing (Amazon Bestsellers scraper)
+    implementation("org.jsoup:jsoup:1.17.2")
 }

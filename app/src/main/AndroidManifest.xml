@@ -37,7 +37,7 @@
         <!-- Widget Action Receiver -->
         <receiver
             android:name=".widget.WidgetReceiver"
-            android:exported="false">
+            android:exported="true">
             <intent-filter>
                 <action android:name="com.ar3ac.bookradar.ACTION_PREV" />
                 <action android:name="com.ar3ac.bookradar.ACTION_NEXT" />
