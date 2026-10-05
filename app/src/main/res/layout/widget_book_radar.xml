@@ -43,7 +43,7 @@
                 android:textSize="9sp"
                 android:textStyle="bold" />
 
-            <View
+            <FrameLayout
                 android:layout_width="0dp"
                 android:layout_height="1dp"
                 android:layout_weight="1" />
@@ -87,7 +87,7 @@
             android:textSize="11sp" />
 
         <!-- Spazio flessibile per spingere i controlli in basso -->
-        <View
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1" />
