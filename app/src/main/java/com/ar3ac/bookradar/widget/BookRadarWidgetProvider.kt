@@ -60,7 +60,7 @@ class BookRadarWidgetProvider : AppWidgetProvider() {
                 }
 
                 // Carica copertina e applica angoli arrotondati
-                val coverBmp = repo.getCoverBitmap(book, 320, 480)
+                val coverBmp = repo.getCoverBitmap(book, 450, 650)
                 if (coverBmp != null) {
                     val roundedBmp = getRoundedCornerBitmap(coverBmp, 20f)
                     views.setImageViewBitmap(R.id.widget_book_cover, roundedBmp)
