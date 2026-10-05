@@ -19,6 +19,9 @@ Porting ufficiale per Android della desklet Cinnamon *book-radar*.
     - 🛒 **Store (Amazon / Giunti)**: apre la pagina d'acquisto del libro nello store o nell'app Amazon.
     - 🔄 **Sincronizza**: avvia un aggiornamento immediato del feed in background.
     - ▶ **Successivo**: passa al libro successivo.
+  - **Rotazione Automatica dello Slideshow (Auto-Cycle)**:
+    - Cicla automaticamente al libro successivo ogni 30 secondi quando lo schermo del telefono è attivo (`PowerManager.isInteractive`).
+    - Quando lo schermo viene spento o il telefono va in standby, il ciclo si sospende automaticamente per azzerare il consumo di batteria, riprendendo non appena si riattiva il dispositivo.
   - Tocco sulla copertina o sul titolo per aprire i dettagli completi e la sinossi nell'app.
 
 - **Sincronizzazione in Background Automatica (WorkManager)**:

@@ -17,6 +17,7 @@ class WidgetReceiver : BroadcastReceiver() {
         const val ACTION_PREV = "com.ar3ac.bookradar.ACTION_PREV"
         const val ACTION_NEXT = "com.ar3ac.bookradar.ACTION_NEXT"
         const val ACTION_SYNC = "com.ar3ac.bookradar.ACTION_SYNC"
+        const val ACTION_CYCLE_TICK = WidgetAutoCycleManager.ACTION_CYCLE_TICK
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -27,20 +28,30 @@ class WidgetReceiver : BroadcastReceiver() {
             ACTION_PREV -> {
                 repo.prevBook()
                 BookRadarWidgetProvider.updateAllWidgets(context)
+                WidgetAutoCycleManager.scheduleNextTick(context, resetDelay = true)
             }
             ACTION_NEXT -> {
                 repo.nextBook()
                 BookRadarWidgetProvider.updateAllWidgets(context)
+                WidgetAutoCycleManager.scheduleNextTick(context, resetDelay = true)
             }
             ACTION_SYNC -> {
                 val syncWork = OneTimeWorkRequestBuilder<BookSyncWorker>().build()
                 WorkManager.getInstance(context).enqueue(syncWork)
 
-                // Avvia anche un refresh asincrono immediato
                 CoroutineScope(Dispatchers.IO).launch {
                     repo.refreshBooks()
                     BookRadarWidgetProvider.updateAllWidgets(context)
+                    WidgetAutoCycleManager.scheduleNextTick(context, resetDelay = true)
                 }
+            }
+            ACTION_CYCLE_TICK -> {
+                val powerManager = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+                if (powerManager?.isInteractive != false) {
+                    repo.nextBook()
+                    BookRadarWidgetProvider.updateAllWidgets(context)
+                }
+                WidgetAutoCycleManager.scheduleNextTick(context)
             }
         }
     }

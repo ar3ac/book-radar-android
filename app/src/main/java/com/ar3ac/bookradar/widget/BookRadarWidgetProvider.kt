@@ -27,7 +27,18 @@ class BookRadarWidgetProvider : AppWidgetProvider() {
             for (id in appWidgetIds) {
                 updateWidgetUI(context, appWidgetManager, id)
             }
+            WidgetAutoCycleManager.scheduleNextTick(context)
         }
+    }
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        WidgetAutoCycleManager.scheduleNextTick(context)
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        WidgetAutoCycleManager.cancelCycling(context)
     }
 
     companion object {

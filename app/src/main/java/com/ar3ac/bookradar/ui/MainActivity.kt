@@ -42,6 +42,9 @@ class MainActivity : AppCompatActivity() {
         setupListeners()
         loadCurrentBookUI()
 
+        // Avvia rotazione automatica del widget se abilitata
+        com.ar3ac.bookradar.widget.WidgetAutoCycleManager.scheduleNextTick(this)
+
         // Controlla se la cache è vuota, se sì avvia il primo sync
         if (repo.getCachedBooks().isEmpty()) {
             syncFeed()

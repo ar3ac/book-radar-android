@@ -42,6 +42,7 @@
                 <action android:name="com.ar3ac.bookradar.ACTION_PREV" />
                 <action android:name="com.ar3ac.bookradar.ACTION_NEXT" />
                 <action android:name="com.ar3ac.bookradar.ACTION_SYNC" />
+                <action android:name="com.ar3ac.bookradar.ACTION_CYCLE_TICK" />
             </intent-filter>
         </receiver>
 
